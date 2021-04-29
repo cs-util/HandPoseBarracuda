@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Mathematics;
 
 namespace MediaPipe.HandPose {
 
@@ -9,27 +8,13 @@ namespace MediaPipe.HandPose {
 
 partial class HandPipeline
 {
-    #region Accessors for vertex buffers
+    #region Public accessors
 
-    public ComputeBuffer RawVertexBuffer
-      => _detector.landmark.OutputBuffer;
+    public ComputeBuffer KeyPointBuffer
+      => _buffer.filter;
 
-    public ComputeBuffer RefinedVertexBuffer
-      => _postBuffer;
-
-    #endregion
-
-    #region Accessors for cropped textures
-
-    public Texture CroppedTexture
-      => _cropRT;
-
-    #endregion
-
-    #region Accessors for crop region matrices
-
-    public float4x4 CropMatrix
-      => _handRegion.CropMatrix;
+    public ComputeBuffer HandRegionBuffer
+      => _buffer.region;
 
     #endregion
 

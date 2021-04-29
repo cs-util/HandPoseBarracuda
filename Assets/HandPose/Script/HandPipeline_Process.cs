@@ -1,6 +1,4 @@
-using System.Linq;
 using UnityEngine;
-using Unity.Mathematics;
 
 namespace MediaPipe.HandPose {
 
@@ -10,32 +8,35 @@ namespace MediaPipe.HandPose {
 
 partial class HandPipeline
 {
-    // Hand region tracker
-    HandRegion _handRegion = new HandRegion();
-
     void RunPipeline(Texture input)
     {
+        var cs = _resources.compute;
+
         // Palm detection
         _detector.palm.ProcessImage(input);
 
-        // Hand region update
-        var palm = _detector.palm.Detections.FirstOrDefault();
-        if (palm.score > 0.3f) _handRegion.Step(palm);
+        // Hand region bounding box update
+        cs.SetFloat("_bbox_dt", Time.deltaTime);
+        cs.SetBuffer(0, "_bbox_count", _detector.palm.CountBuffer);
+        cs.SetBuffer(0, "_bbox_palm", _detector.palm.DetectionBuffer);
+        cs.SetBuffer(0, "_bbox_region", _buffer.region);
+        cs.Dispatch(0, 1, 1, 1);
 
         // Hand region cropping
-        _preprocess.SetMatrix("_Xform", _handRegion.CropMatrix);
-        Graphics.Blit(input, _cropRT, _preprocess, 0);
+        cs.SetTexture(1, "_crop_input", input);
+        cs.SetBuffer(1, "_crop_region", _buffer.region);
+        cs.SetBuffer(1, "_crop_output", _buffer.crop);
+        cs.Dispatch(1, CropSize / 8, CropSize / 8, 1);
 
         // Hand landmark detection
-        _detector.landmark.ProcessImage(_cropRT);
+        _detector.landmark.ProcessImage(_buffer.crop);
 
-        // Postprocess for hand mesh construction
-        var post = _resources.postprocessCompute;
-        post.SetMatrix("_mesh_xform", _handRegion.CropMatrix);
-        post.SetVector("_mesh_filter", new Vector3(30, 1.5f, Time.deltaTime));
-        post.SetBuffer(0, "_mesh_input", _detector.landmark.OutputBuffer);
-        post.SetBuffer(0, "_mesh_output", _postBuffer);
-        post.Dispatch(0, 1, 1, 1);
+        // Key point postprocess
+        cs.SetFloat("_post_dt", Time.deltaTime);
+        cs.SetBuffer(2, "_post_input", _detector.landmark.OutputBuffer);
+        cs.SetBuffer(2, "_post_region", _buffer.region);
+        cs.SetBuffer(2, "_post_output", _buffer.filter);
+        cs.Dispatch(2, 1, 1, 1);
     }
 }
 
